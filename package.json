@@ -1,0 +1,14 @@
+{
+  "name": "youtube-chat",
+  "version": "1.0.0",
+  "description": "A YouTube Live Chat plugin for Zeno Krunker Client",
+  "main": "index.js",
+  "author": "TheDevKeval",
+  "license": "MIT",
+  "id": 1,
+  "pVersion": 1,
+  "thumb": "https://cdn.discordapp.com/attachments/792583760666165249/803568423413350420/Zeno_Plug_YouTubeChat.png",
+  "dependencies": {
+    "youtube-live-chat": "^1.0.3"
+  }
+}
