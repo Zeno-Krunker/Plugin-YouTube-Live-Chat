@@ -1,24 +1,27 @@
+const { EventEmitter } = require('events');
+const YouTube = require('youtube-live-chat');
+const events = new EventEmitter();
+
 exports.init = ({ store }) => {
-    const YouTube = require('youtube-live-chat');
     let channel = store.get("YTChannelId");
-    
-    genChatBox(store);
 
-    if(!channel) return document.getElementById('streamChatContainer').insertAdjacentHTML('beforeend', `<center style="position: relative; top: 50%; transform: translateY(-50%);"><span class="material-icons" style="font-size: 100px; color: rgba(255, 0, 0, 0.3);">report_problem</span></br>Channel not set!</center>`);
+    let chat = genChatBox(store);
+    if(!channel) return chat.insertAdjacentHTML('beforeend', `<center style="position: relative; top: 50%; transform: translateY(-50%);"><span class="material-icons" style="font-size: 100px; color: rgba(255, 0, 0, 0.3);">report_problem</span></br>Channel not set!</center>`);
 
-    const YT = new YouTube(channel, 'AIzaSyAOTwQOKUlia_lVUaCABoAmb5Eh6xNjPKg');
-    YT.listen(5000);
- 
-    YT.on("error", e => {
-        console.log(e);
-        document.getElementById('streamChatContainer').insertAdjacentHTML('beforeend', `<center style="position: relative; top: 50%; transform: translateY(-50%);"><span class="material-icons" style="font-size: 100px; color: rgba(255, 0, 0, 0.3);">report_problem</span></br>Couldn't resolve to a chat!</center>`)
-        YT.stop();
+    let YT;
+    initChannel(YT, channel, chat);
+
+    events.on("channelChange", () => {
+        console.log("channelChange");
+        channel = store.get("YTChannelId");
+        initChannel(YT, channel, chat)
     });
 
-    YT.on('message', (data) => {
-        let author = data.authorDetails.displayName;
-        let message = data.snippet.displayMessage;
-        document.getElementById('streamChatContainer').insertAdjacentHTML('afterbegin', `<div class="streamChatMsg">${author} : <span style="color: white">${message}</span></div>`)
+    events.on("channelReset", () => {
+        console.log("channelReset");
+        channel = undefined;
+        if(YT) YT.stop();
+        chat.innerHTML = `<center style="position: relative; top: 50%; transform: translateY(-50%);"><span class="material-icons" style="font-size: 100px; color: rgba(255, 0, 0, 0.3);">report_problem</span></br>Channel not set!</center>`
     });
 }
 
@@ -30,6 +33,25 @@ function genChatBox(store) {
     let background = store.get("YTBackground") || "rgba(100, 100, 100, 0.5)";
     let opacity = store.get("YTOpacity") || "0.3";
     document.getElementById("chatUI").insertAdjacentHTML(`beforeend`, `<div id="streamChatContainer" style="position: absolute;height:${height};width:${width};z-index: 9;background-color:${background};top:${top};left:${left};transform: translateY(-50%);opacity: ${opacity}; overflow: hidden;"></div>`);
+    return document.getElementById('streamChatContainer');
+}
+
+function initChannel(YT, channelId, chat) {
+    if(YT) YT.stop();
+    chat.innerHTML = "";
+    YT = new YouTube(channelId, 'AIzaSyAOTwQOKUlia_lVUaCABoAmb5Eh6xNjPKg');
+
+    YT.on("error", e => {
+        console.log(e);
+        chat.insertAdjacentHTML('beforeend', `<center style="position: relative; top: 50%; transform: translateY(-50%);"><span class="material-icons" style="font-size: 100px; color: rgba(255, 0, 0, 0.3);">report_problem</span></br>Couldn't resolve to a chat!</center>`)
+        YT.stop();  
+    });
+    YT.on('message', (data) => {
+        let author = data.authorDetails.displayName;
+        let message = data.snippet.displayMessage;
+        chat.insertAdjacentHTML('afterbegin', `<div class="streamChatMsg">${author} : <span style="color: white">${message}</span></div>`)
+    });
+    YT.listen(5000);
 }
 
 exports.settings = [
@@ -45,15 +67,19 @@ exports.settings = [
                 buttonLabel: "Set",
                 buttonId: "yt_channelid_btn",
                 storeKey: "YTChannelId",
-                cb: (value, store) => store.set("YTChannelId", value),
-                requireRestart: true
+                cb: (value, store) => {
+                    store.set("YTChannelId", value);
+                    events.emit("channelChange");
+                },
             }, {
                 type: "BUTTON",
                 label: "Remove Channel",
                 buttonId: "yt_removechannel_btn",
                 buttonLabel: "Remove",
-                cb: (store) => store.delete("YTChannelId"),
-                requireRestart: true
+                cb: (store) => {
+                    store.delete("YTChannelId");
+                    events.emit("channelReset");
+                },
             }
         ]
     }, {
